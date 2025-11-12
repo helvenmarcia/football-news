@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from main.forms import NewsForm
 from main.models import News
 
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.core import serializers
 
 from django.contrib import messages
@@ -20,6 +20,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.html import strip_tags
 import json
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.utils.html import strip_tags
+
 
 @login_required(login_url='/login')
 def show_main(request):
@@ -53,6 +57,28 @@ def create_news(request):
     }
 
     return render(request, "create_news.html", context)
+
+@csrf_exempt
+@require_POST
+def add_news_entry_ajax(request):
+    title = strip_tags(request.POST.get("title")) # strip HTML tags!
+    content = strip_tags(request.POST.get("content")) # strip HTML tags!
+    category = request.POST.get("category")
+    thumbnail = request.POST.get("thumbnail")
+    is_featured = request.POST.get("is_featured") == 'on'  # checkbox handling
+    user = request.user
+
+    new_news = News(
+        title=title, 
+        content=content,
+        category=category,
+        thumbnail=thumbnail,
+        is_featured=is_featured,
+        user=user
+    )
+    new_news.save()
+
+    return HttpResponse(b"CREATED", status=201)
 
 def edit_news(request, id):
     news = get_object_or_404(News, pk=id)
@@ -127,8 +153,8 @@ def show_json_by_id(request, news_id):
             'news_views': news.news_views,
             'created_at': news.created_at.isoformat() if news.created_at else None,
             'is_featured': news.is_featured,
-            'user_id': news.user_id, # type: ignore
-            'user_username': news.user.username if news.user else None,
+            'user_id': news.user_id,
+            'user_username': news.user.username if news.user_id else None,
         }
         return JsonResponse(data)
     except News.DoesNotExist:
